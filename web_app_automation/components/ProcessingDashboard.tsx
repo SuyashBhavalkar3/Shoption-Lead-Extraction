@@ -76,7 +76,7 @@ function FileCard({ fr }: { fr: FileResult }) {
     };
 
     return (
-        <div className="bg-card-bg/60 backdrop-blur-md border border-card-border rounded-2xl overflow-hidden shadow-md transition-all duration-300">
+        <div className="bg-card-bg border border-card-border rounded-2xl overflow-hidden transition-all duration-300">
             {/* ── Card Header ── */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4">
                 {/* Left: status + name */}
@@ -85,10 +85,10 @@ function FileCard({ fr }: { fr: FileResult }) {
                         <Loader2 className="w-5 h-5 text-primary-brand animate-spin shrink-0" />
                     )}
                     {fr.status === 'success' && (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                        <CheckCircle2 className="w-5 h-5 text-primary-brand shrink-0" />
                     )}
                     {fr.status === 'error' && (
-                        <FileX2 className="w-5 h-5 text-rose-500 shrink-0" />
+                        <FileX2 className="w-5 h-5 text-muted-text shrink-0" />
                     )}
                     <span className="font-semibold text-text-base text-sm truncate">{fr.fileName}</span>
                 </div>
@@ -104,17 +104,17 @@ function FileCard({ fr }: { fr: FileResult }) {
                             <span className="text-xs font-semibold px-2.5 py-1 bg-bg-base rounded-lg text-text-base border border-card-border">
                                 {fr.result.summary.totalRows} rows
                             </span>
-                            <span className="text-xs font-semibold px-2.5 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg border border-emerald-500/20">
+                            <span className="text-xs font-semibold px-2.5 py-1 bg-card-bg text-primary-brand rounded-lg border border-card-border">
                                 {fr.result.summary.processedRows} ok
                             </span>
                             {fr.result.summary.failedRows > 0 && (
-                                <span className="text-xs font-semibold px-2.5 py-1 bg-rose-500/10 text-rose-500 rounded-lg border border-rose-500/20">
+                                <span className="text-xs font-semibold px-2.5 py-1 bg-bg-base text-muted-text rounded-lg border border-card-border">
                                     {fr.result.summary.failedRows} failed
                                 </span>
                             )}
                             <button
                                 onClick={handleDownload}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-brand text-white text-xs font-bold rounded-xl hover:bg-primary-brand/90 active:scale-95 transition-all shadow-sm"
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-brand text-bg-base text-xs font-bold rounded-xl hover:bg-primary-brand active:scale-95 transition-all"
                             >
                                 <Download className="w-3.5 h-3.5" />
                                 Download
@@ -130,7 +130,7 @@ function FileCard({ fr }: { fr: FileResult }) {
                     )}
 
                     {fr.status === 'error' && (
-                        <span className="text-xs text-rose-500 font-semibold max-w-[260px] truncate" title={fr.error}>
+                        <span className="text-xs text-muted-text font-semibold max-w-[260px] truncate" title={fr.error}>
                             {fr.error}
                         </span>
                     )}
@@ -275,7 +275,7 @@ export default function ProcessingDashboard() {
                     <div className="flex items-center gap-3">
                         <button
                             onClick={reset}
-                            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-muted-text hover:text-text-base bg-card-bg border border-card-border hover:bg-bg-base/80 rounded-xl transition-all shadow-sm active:scale-95"
+                            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-muted-text hover:text-text-base bg-card-bg border border-card-border hover:bg-bg-base rounded-xl transition-all active:scale-95"
                         >
                             <RefreshCcw className="w-4 h-4" />
                             Clear All
@@ -291,7 +291,7 @@ export default function ProcessingDashboard() {
                 isLoading={isProcessing}
             />
 
-            <div className="bg-card-bg/60 backdrop-blur-md border border-card-border rounded-2xl p-4 md:p-5">
+            <div className="bg-card-bg border border-card-border rounded-2xl p-4 md:p-5">
                 <div className="flex flex-col gap-4">
                     <div className="min-w-0">
                         <p className="text-sm font-semibold text-text-base">Time Filter (created_time)</p>
@@ -358,7 +358,7 @@ export default function ProcessingDashboard() {
                                 setTimeFilterEnabled(false);
                                 reprocessAll(sourceFiles, '');
                             }}
-                            className="px-3 py-2 rounded-xl border border-card-border text-sm font-semibold text-muted-text hover:text-text-base hover:bg-bg-base/70 transition-all"
+                            className="px-3 py-2 rounded-xl border border-card-border text-sm font-semibold text-muted-text hover:text-text-base hover:bg-bg-base transition-all"
                         >
                             None (All)
                         </button>
@@ -371,7 +371,7 @@ export default function ProcessingDashboard() {
                                     const parsed = from24HourTime(preset);
                                     applyClockTime(parsed.hour12, parsed.minute, parsed.meridiem);
                                 }}
-                                className="px-2.5 py-1.5 rounded-lg border border-card-border text-xs font-semibold text-muted-text hover:text-text-base hover:bg-bg-base/70 transition-all"
+                                className="px-2.5 py-1.5 rounded-lg border border-card-border text-xs font-semibold text-muted-text hover:text-text-base hover:bg-bg-base transition-all"
                             >
                                 {preset}
                             </button>
@@ -385,7 +385,7 @@ export default function ProcessingDashboard() {
 
             {/* ── Global Error ── */}
             {globalError && (
-                <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-start gap-3 text-rose-500 animate-in fade-in duration-300">
+                <div className="p-4 bg-bg-base border border-card-border rounded-2xl flex items-start gap-3 text-muted-text animate-in fade-in duration-300">
                     <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                     <p className="text-sm font-semibold whitespace-pre-line">{globalError}</p>
                 </div>
@@ -394,18 +394,18 @@ export default function ProcessingDashboard() {
             {/* ── Aggregate Stats (shown only once there are results) ── */}
             {hasResults && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-card-bg/60 backdrop-blur-md p-6 rounded-2xl border border-card-border shadow-md">
+                    <div className="bg-card-bg p-6 rounded-2xl border border-card-border">
                         <p className="text-sm font-semibold text-muted-text">Total Rows</p>
                         <p className="text-3xl font-extrabold text-text-base mt-1">{totalRows}</p>
                         <p className="text-xs text-muted-text mt-0.5">{successResults.length} file(s) processed</p>
                     </div>
-                    <div className="bg-card-bg/60 backdrop-blur-md p-6 rounded-2xl border border-card-border border-l-4 border-l-emerald-500 shadow-md">
+                    <div className="bg-card-bg p-6 rounded-2xl border border-card-border">
                         <p className="text-sm font-semibold text-muted-text">Processed Successfully</p>
-                        <p className="text-3xl font-extrabold text-emerald-500 mt-1">{processedRows}</p>
+                        <p className="text-3xl font-extrabold text-primary-brand mt-1">{processedRows}</p>
                     </div>
-                    <div className="bg-card-bg/60 backdrop-blur-md p-6 rounded-2xl border border-card-border border-l-4 border-l-rose-500 shadow-md">
+                    <div className="bg-card-bg p-6 rounded-2xl border border-card-border">
                         <p className="text-sm font-semibold text-muted-text">Skipped / Failed</p>
-                        <p className="text-3xl font-extrabold text-rose-500 mt-1">{skippedOrFailedRows}</p>
+                        <p className="text-3xl font-extrabold text-text-base mt-1">{skippedOrFailedRows}</p>
                     </div>
                 </div>
             )}
@@ -418,7 +418,7 @@ export default function ProcessingDashboard() {
                             <button
                                 onClick={handleDownloadAll}
                                 disabled={isProcessing}
-                                className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-primary-brand hover:bg-primary-brand/90 rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-bg-base bg-primary-brand hover:bg-primary-brand rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Files className="w-4 h-4" />
                                 Download Combined Sanitized
@@ -441,9 +441,9 @@ export default function ProcessingDashboard() {
                     ].map((feature, i) => (
                         <div
                             key={i}
-                            className="p-6 bg-card-bg/60 backdrop-blur-md border border-card-border rounded-2xl shadow-lg hover:scale-[1.02] transition-all duration-300"
+                            className="p-6 bg-card-bg border border-card-border rounded-2xl hover:scale-[1.02] transition-all duration-300"
                         >
-                            <div className="w-12 h-12 bg-primary-brand/10 text-primary-brand rounded-xl flex items-center justify-center mb-4">
+                            <div className="w-12 h-12 bg-bg-base text-primary-brand rounded-xl flex items-center justify-center mb-4">
                                 <feature.icon className="w-6 h-6" />
                             </div>
                             <h3 className="font-bold text-text-base mb-2">{feature.title}</h3>

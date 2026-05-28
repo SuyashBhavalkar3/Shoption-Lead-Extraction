@@ -146,8 +146,8 @@ export default function CSVUpload({ onFilesReady, onError, isLoading }: CSVUploa
             className={`
                 relative border-2 border-dashed rounded-2xl p-12 transition-all duration-300
                 ${isDragging
-                    ? 'border-primary-brand bg-primary-brand/[0.04] scale-[0.99]'
-                    : 'border-card-border hover:border-muted-border hover:scale-[1.01] bg-card-bg/60 backdrop-blur-md shadow-lg shadow-black/[0.02]'
+                    ? 'border-primary-brand bg-card-bg scale-[0.99]'
+                    : 'border-card-border hover:border-muted-border hover:scale-[1.01] bg-card-bg'
                 }
                 ${busy ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
             `}
@@ -165,7 +165,7 @@ export default function CSVUpload({ onFilesReady, onError, isLoading }: CSVUploa
                 <div
                     className={`p-4 rounded-2xl transition-all duration-300 ${
                         isDragging
-                            ? 'bg-primary-brand/10 text-primary-brand scale-110'
+                            ? 'bg-card-bg text-primary-brand scale-110'
                             : 'bg-bg-base text-muted-text'
                     }`}
                 >
@@ -188,7 +188,7 @@ export default function CSVUpload({ onFilesReady, onError, isLoading }: CSVUploa
                 </div>
 
                 {!busy && (
-                    <button className="px-5 py-2.5 bg-primary-brand text-white rounded-xl text-sm font-semibold hover:bg-primary-brand/95 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary-brand/15">
+                    <button className="px-5 py-2.5 bg-primary-brand text-bg-base rounded-xl text-sm font-semibold hover:bg-primary-brand hover:scale-105 active:scale-95 transition-all">
                         Select Files
                     </button>
                 )}
