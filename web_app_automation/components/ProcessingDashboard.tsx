@@ -1,164 +1,299 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Download, CheckCircle2, AlertCircle, RefreshCcw, FileSpreadsheet, Activity } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import {
+    Download, CheckCircle2, AlertCircle, RefreshCcw,
+    FileSpreadsheet, Activity, Loader2, ChevronDown, ChevronUp, FileX2, Files
+} from 'lucide-react';
 import Papa from 'papaparse';
-import CSVUpload from './CSVUpload';
+import CSVUpload, { ParsedFile } from './CSVUpload';
 import LogConsole from './LogConsole';
 import DataPreview from './DataPreview';
-import { processCSVData } from '@/lib/utils/csv-processor';
-import { ProcessingResult, RawLead } from '@/lib/types';
+import { processCSVData, FIXED_SCHEMA_HEADERS } from '@/lib/utils/csv-processor';
+import { FileResult } from '@/lib/types';
 
-export default function ProcessingDashboard() {
-    const [isLoading, setIsLoading] = useState(false);
-    const [result, setResult] = useState<ProcessingResult | null>(null);
-    const [fileName, setFileName] = useState<string>('');
-    const [error, setError] = useState<string | null>(null);
+// ─── helpers ────────────────────────────────────────────────────────────────
 
-    const handleUpload = (rawData: RawLead[], name: string, mapping: Record<string, string>) => {
-        setIsLoading(true);
-        setError(null);
-        setFileName(name);
+function generateCSVBlob(result: NonNullable<FileResult['result']>): string {
+    return Papa.unparse({ fields: result.headers, data: result.data });
+}
 
-        // Simulate process delay for better UX
-        setTimeout(() => {
-            try {
-                const processingResult = processCSVData(rawData, mapping);
-                setResult(processingResult);
-            } catch (err) {
-                setError(err instanceof Error ? err.message : 'An unexpected error occurred during processing.');
-            } finally {
-                setIsLoading(false);
-            }
-        }, 800);
-    };
+function triggerDownload(csvString: string, filename: string) {
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+function uniqueId(name: string) {
+    return `${Date.now()}-${name}`;
+}
+
+// ─── FileCard ────────────────────────────────────────────────────────────────
+
+function FileCard({ fr }: { fr: FileResult }) {
+    const [open, setOpen] = useState(false);
 
     const handleDownload = () => {
-        if (!result) return;
+        if (!fr.result) return;
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        triggerDownload(generateCSVBlob(fr.result), `sanitized_${fr.fileName}_${ts}.csv`);
+    };
 
-        // PapaParse handles arrays of arrays automatically
-        const csv = Papa.unparse({
-            fields: result.headers,
-            data: result.data
+    return (
+        <div className="bg-card-bg/60 backdrop-blur-md border border-card-border rounded-2xl overflow-hidden shadow-md transition-all duration-300">
+            {/* ── Card Header ── */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4">
+                {/* Left: status + name */}
+                <div className="flex items-center gap-3 min-w-0">
+                    {fr.status === 'processing' && (
+                        <Loader2 className="w-5 h-5 text-primary-brand animate-spin shrink-0" />
+                    )}
+                    {fr.status === 'success' && (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                    )}
+                    {fr.status === 'error' && (
+                        <FileX2 className="w-5 h-5 text-rose-500 shrink-0" />
+                    )}
+                    <span className="font-semibold text-text-base text-sm truncate">{fr.fileName}</span>
+                </div>
+
+                {/* Right: stats + buttons */}
+                <div className="flex items-center gap-3 shrink-0 flex-wrap">
+                    {fr.status === 'processing' && (
+                        <span className="text-xs text-muted-text font-medium">Processing…</span>
+                    )}
+
+                    {fr.status === 'success' && fr.result && (
+                        <>
+                            <span className="text-xs font-semibold px-2.5 py-1 bg-bg-base rounded-lg text-text-base border border-card-border">
+                                {fr.result.summary.totalRows} rows
+                            </span>
+                            <span className="text-xs font-semibold px-2.5 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg border border-emerald-500/20">
+                                {fr.result.summary.processedRows} ok
+                            </span>
+                            {fr.result.summary.failedRows > 0 && (
+                                <span className="text-xs font-semibold px-2.5 py-1 bg-rose-500/10 text-rose-500 rounded-lg border border-rose-500/20">
+                                    {fr.result.summary.failedRows} failed
+                                </span>
+                            )}
+                            <button
+                                onClick={handleDownload}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-brand text-white text-xs font-bold rounded-xl hover:bg-primary-brand/90 active:scale-95 transition-all shadow-sm"
+                            >
+                                <Download className="w-3.5 h-3.5" />
+                                Download
+                            </button>
+                            <button
+                                onClick={() => setOpen((o) => !o)}
+                                className="p-1.5 text-muted-text hover:text-text-base bg-bg-base border border-card-border rounded-xl transition-all active:scale-95"
+                                title={open ? 'Collapse' : 'Expand preview & logs'}
+                            >
+                                {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            </button>
+                        </>
+                    )}
+
+                    {fr.status === 'error' && (
+                        <span className="text-xs text-rose-500 font-semibold max-w-[260px] truncate" title={fr.error}>
+                            {fr.error}
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* ── Expanded Section ── */}
+            {open && fr.status === 'success' && fr.result && (
+                <div className="border-t border-card-border grid grid-cols-1 lg:grid-cols-3 gap-0">
+                    <div className="lg:col-span-2 p-5">
+                        <DataPreview data={fr.result.data} headers={fr.result.headers} />
+                    </div>
+                    <div className="lg:col-span-1 p-5 border-t lg:border-t-0 lg:border-l border-card-border">
+                        <LogConsole logs={fr.result.logs} />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── ProcessingDashboard ────────────────────────────────────────────────────
+
+export default function ProcessingDashboard() {
+    const [fileResults, setFileResults] = useState<FileResult[]>([]);
+    const [globalError, setGlobalError] = useState<string | null>(null);
+
+    const isProcessing = fileResults.some((f) => f.status === 'processing');
+    const successResults = fileResults.filter((f) => f.status === 'success' && f.result);
+    const hasResults = fileResults.length > 0;
+
+    // ── Aggregate stats across all files ──
+    const totalRows = successResults.reduce((s, f) => s + (f.result?.summary.totalRows ?? 0), 0);
+    const processedRows = successResults.reduce((s, f) => s + (f.result?.summary.processedRows ?? 0), 0);
+    const failedRows = successResults.reduce((s, f) => s + (f.result?.summary.failedRows ?? 0), 0);
+
+    // ── Handle multiple uploaded files ──
+    const handleFilesReady = useCallback((parsedFiles: ParsedFile[]) => {
+        setGlobalError(null);
+
+        // Create placeholder entries in "processing" state
+        const placeholders: FileResult[] = parsedFiles.map((pf) => ({
+            id: uniqueId(pf.fileName),
+            fileName: pf.fileName,
+            status: 'processing',
+        }));
+
+        setFileResults((prev) => [...prev, ...placeholders]);
+
+        // Process each file independently (with a small stagger for UX)
+        parsedFiles.forEach((pf, idx) => {
+            const id = placeholders[idx].id;
+            setTimeout(() => {
+                try {
+                    const result = processCSVData(pf.data, pf.mapping);
+                    setFileResults((prev) =>
+                        prev.map((fr) =>
+                            fr.id === id ? { ...fr, status: 'success', result } : fr
+                        )
+                    );
+                } catch (err) {
+                    setFileResults((prev) =>
+                        prev.map((fr) =>
+                            fr.id === id
+                                ? {
+                                      ...fr,
+                                      status: 'error',
+                                      error:
+                                          err instanceof Error
+                                              ? err.message
+                                              : 'Unexpected error',
+                                  }
+                                : fr
+                        )
+                    );
+                }
+            }, idx * 200); // stagger 200ms per file for smoother UX
         });
+    }, []);
 
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-
-        link.setAttribute('href', url);
-        link.setAttribute('download', `sanitized_${timestamp}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    // ── Download all files merged into one CSV ──
+    const handleDownloadAll = () => {
+        const allRows = successResults.flatMap((f) => f.result!.data);
+        if (allRows.length === 0) return;
+        const csv = Papa.unparse({ fields: FIXED_SCHEMA_HEADERS, data: allRows });
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        triggerDownload(csv, `sanitized_all_${ts}.csv`);
     };
 
     const reset = () => {
-        setResult(null);
-        setFileName('');
-        setError(null);
+        setFileResults([]);
+        setGlobalError(null);
     };
 
     return (
         <div className="max-w-6xl mx-auto space-y-8 p-4 md:p-8">
-            {/* Header */}
+            {/* ── Header ── */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-card-border pb-6">
                 <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary-brand via-indigo-500 to-violet-600 bg-clip-text text-transparent">
+                    <h1 className="text-3xl font-extrabold tracking-tight text-text-base">
                         CRM CSV Sanitizer
                     </h1>
-                    <p className="text-muted-text mt-1 text-sm font-medium">Production-safe lead data transformation tool</p>
+                    <p className="text-muted-text mt-1 text-sm font-medium">
+                        Production-safe lead data transformation tool
+                    </p>
                 </div>
 
-                {result && (
-                    <button
-                        onClick={reset}
-                        className="flex items-center space-x-2 px-4 py-2.5 text-sm font-semibold text-muted-text hover:text-text-base bg-card-bg border border-card-border hover:bg-bg-base/80 rounded-xl transition-all shadow-sm active:scale-95"
-                    >
-                        <RefreshCcw className="w-4 h-4" />
-                        <span>Process New File</span>
-                    </button>
+                {hasResults && (
+                    <div className="flex items-center gap-3">
+                        {successResults.length > 1 && (
+                            <button
+                                onClick={handleDownloadAll}
+                                disabled={isProcessing}
+                                className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-primary-brand hover:bg-primary-brand/90 rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Files className="w-4 h-4" />
+                                Download All
+                            </button>
+                        )}
+                        <button
+                            onClick={reset}
+                            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-muted-text hover:text-text-base bg-card-bg border border-card-border hover:bg-bg-base/80 rounded-xl transition-all shadow-sm active:scale-95"
+                        >
+                            <RefreshCcw className="w-4 h-4" />
+                            Clear All
+                        </button>
+                    </div>
                 )}
             </div>
 
-            {!result ? (
-                <div className="space-y-8">
-                    <CSVUpload onUpload={handleUpload} onError={setError} isLoading={isLoading} />
+            {/* ── Upload Zone ── */}
+            <CSVUpload
+                onFilesReady={handleFilesReady}
+                onError={setGlobalError}
+                isLoading={isProcessing}
+            />
 
-                    {error && (
-                        <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-start space-x-3 text-rose-500 animate-in fade-in slide-in-from-top-2 duration-300">
-                            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                            <p className="text-sm font-semibold">{error}</p>
-                        </div>
-                    )}
+            {/* ── Global Error ── */}
+            {globalError && (
+                <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-start gap-3 text-rose-500 animate-in fade-in duration-300">
+                    <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                    <p className="text-sm font-semibold whitespace-pre-line">{globalError}</p>
+                </div>
+            )}
 
-                    {/* Features Info */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
-                        {[
-                            { title: "Strict Schema", desc: "Maintains 100% fixed column order and naming for CRM compatibility.", icon: FileSpreadsheet },
-                            { title: "Safe Sanitization", desc: "Predictable cleaning for phone numbers and campaign IDs.", icon: CheckCircle2 },
-                            { title: "Real-time Logs", desc: "Detailed processing logs and validation error reporting.", icon: Activity },
-                        ].map((feature, i) => (
-                            <div key={i} className="p-6 bg-card-bg/60 backdrop-blur-md border border-card-border rounded-2xl shadow-lg shadow-black/[0.01] hover:scale-[1.02] transition-all duration-300">
-                                <div className="w-12 h-12 bg-primary-brand/10 text-primary-brand rounded-xl flex items-center justify-center mb-4 shadow-inner">
-                                    <feature.icon className="w-6 h-6" />
-                                </div>
-                                <h3 className="font-bold text-text-base mb-2">{feature.title}</h3>
-                                <p className="text-sm text-muted-text leading-relaxed font-medium">{feature.desc}</p>
-                            </div>
-                        ))}
+            {/* ── Aggregate Stats (shown only once there are results) ── */}
+            {hasResults && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-card-bg/60 backdrop-blur-md p-6 rounded-2xl border border-card-border shadow-md">
+                        <p className="text-sm font-semibold text-muted-text">Total Rows</p>
+                        <p className="text-3xl font-extrabold text-text-base mt-1">{totalRows}</p>
+                        <p className="text-xs text-muted-text mt-0.5">{successResults.length} file(s) processed</p>
+                    </div>
+                    <div className="bg-card-bg/60 backdrop-blur-md p-6 rounded-2xl border border-card-border border-l-4 border-l-emerald-500 shadow-md">
+                        <p className="text-sm font-semibold text-muted-text">Processed Successfully</p>
+                        <p className="text-3xl font-extrabold text-emerald-500 mt-1">{processedRows}</p>
+                    </div>
+                    <div className="bg-card-bg/60 backdrop-blur-md p-6 rounded-2xl border border-card-border border-l-4 border-l-rose-500 shadow-md">
+                        <p className="text-sm font-semibold text-muted-text">Skipped / Failed</p>
+                        <p className="text-3xl font-extrabold text-rose-500 mt-1">{failedRows}</p>
                     </div>
                 </div>
-            ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {/* Summary Cards */}
-                    <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-card-bg/60 backdrop-blur-md p-6 rounded-2xl border border-card-border shadow-md">
-                            <p className="text-sm font-semibold text-muted-text">Total Rows</p>
-                            <p className="text-3xl font-extrabold text-text-base mt-1">{result.summary.totalRows}</p>
-                        </div>
-                        <div className="bg-card-bg/60 backdrop-blur-md p-6 rounded-2xl border border-card-border border-l-4 border-l-emerald-500 shadow-md">
-                            <p className="text-sm font-semibold text-muted-text">Processed Successfully</p>
-                            <p className="text-3xl font-extrabold text-emerald-500 mt-1">{result.summary.processedRows}</p>
-                        </div>
-                        <div className="bg-card-bg/60 backdrop-blur-md p-6 rounded-2xl border border-card-border border-l-4 border-l-rose-500 shadow-md">
-                            <p className="text-sm font-semibold text-muted-text">Skipped/Failed</p>
-                            <p className="text-3xl font-extrabold text-rose-500 mt-1">{result.summary.failedRows}</p>
-                        </div>
-                    </div>
+            )}
 
-                    {/* Main Action Area */}
-                    <div className="lg:col-span-2 space-y-8">
-                        <div className="bg-gradient-to-br from-primary-brand via-indigo-600 to-indigo-800 rounded-3xl p-8 text-white flex flex-col items-center justify-center text-center space-y-6 shadow-xl shadow-primary-brand/10 relative overflow-hidden">
-                            {/* Glowing accents inside the card */}
-                            <div className="absolute top-[-20%] right-[-20%] w-64 h-64 rounded-full bg-white/5 blur-[50px] pointer-events-none" />
-                            <div className="absolute bottom-[-20%] left-[-20%] w-64 h-64 rounded-full bg-black/10 blur-[50px] pointer-events-none" />
-                            
-                            <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-lg">
-                                <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+            {/* ── Per-file Result Cards ── */}
+            {hasResults && (
+                <div className="space-y-4">
+                    {fileResults.map((fr) => (
+                        <FileCard key={fr.id} fr={fr} />
+                    ))}
+                </div>
+            )}
+
+            {/* ── Feature Cards (shown on empty state) ── */}
+            {!hasResults && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                    {[
+                        { title: 'Strict Schema', desc: 'Maintains 100% fixed column order and naming for CRM compatibility.', icon: FileSpreadsheet },
+                        { title: 'Safe Sanitization', desc: 'Predictable cleaning for phone numbers and campaign IDs.', icon: CheckCircle2 },
+                        { title: 'Real-time Logs', desc: 'Detailed processing logs and validation error reporting per file.', icon: Activity },
+                    ].map((feature, i) => (
+                        <div
+                            key={i}
+                            className="p-6 bg-card-bg/60 backdrop-blur-md border border-card-border rounded-2xl shadow-lg hover:scale-[1.02] transition-all duration-300"
+                        >
+                            <div className="w-12 h-12 bg-primary-brand/10 text-primary-brand rounded-xl flex items-center justify-center mb-4">
+                                <feature.icon className="w-6 h-6" />
                             </div>
-                            <div className="relative z-10">
-                                <h2 className="text-2xl font-extrabold tracking-tight">Processing Complete!</h2>
-                                <p className="text-indigo-100 mt-1.5 font-medium">Your sanitized CSV for &quot;{fileName}&quot; is ready.</p>
-                            </div>
-                            <button
-                                onClick={handleDownload}
-                                className="group flex items-center space-x-3 px-8 py-4 bg-white text-indigo-700 rounded-2xl font-extrabold text-lg hover:bg-slate-50 transition-all transform hover:scale-[1.03] shadow-xl hover:shadow-2xl active:scale-[0.98]"
-                            >
-                                <Download className="w-5 h-5 group-hover:animate-bounce" />
-                                <span>Download Sanitized CSV</span>
-                            </button>
+                            <h3 className="font-bold text-text-base mb-2">{feature.title}</h3>
+                            <p className="text-sm text-muted-text leading-relaxed font-medium">{feature.desc}</p>
                         </div>
-
-                        <DataPreview data={result.data} headers={result.headers} />
-                    </div>
-
-                    {/* Sidebar Area */}
-                    <div className="lg:col-span-1">
-                        <LogConsole logs={result.logs} />
-                    </div>
+                    ))}
                 </div>
             )}
         </div>

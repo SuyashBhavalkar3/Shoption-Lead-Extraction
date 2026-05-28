@@ -64,3 +64,12 @@ export interface ProcessingResult {
     failedRows: number;
   };
 }
+
+/** Represents the processing outcome of a single uploaded file */
+export interface FileResult {
+  id: string;             // unique key (timestamp + name)
+  fileName: string;
+  status: 'processing' | 'success' | 'error';
+  result?: ProcessingResult;
+  error?: string;
+}
