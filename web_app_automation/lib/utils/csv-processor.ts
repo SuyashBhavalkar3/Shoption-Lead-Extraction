@@ -73,7 +73,8 @@ export function processCSVData(rawData: RawLead[], headerMapping: Record<string,
             const email = generateEmailFromPhone(phone);
             const campaignId = sanitizeCampaignId(String(row[headerMapping['campaign_id']] || ""));
             const source = String(row[headerMapping['platform']] || "");
-            const city = extractCity(String(row['street_address'] || row['City'] || ""));
+            const cityKey = headerMapping['city'];
+            const city = extractCity(String((cityKey && row[cityKey]) || row['street_address'] || row['City'] || ""));
             const col1 = String(row['ad_name'] || row['campaign_name'] || "");
 
             // Identify Marathi questions (columns with non-ASCII or specific patterns)
@@ -84,15 +85,17 @@ export function processCSVData(rawData: RawLead[], headerMapping: Record<string,
                 !usedKeys.includes(key) && key.length > 5 // Heuristic: Marathi questions are usually long
             );
 
-            const q1 = potentialMarathiKeys[0] || "";
-            const q2 = potentialMarathiKeys[1] || "";
-            const q3 = potentialMarathiKeys[2] || "";
-            const q4 = potentialMarathiKeys[3] || "";
+            // Extract up to 10 questions and their answers dynamically
+            const questions = Array(10).fill("");
+            const answers = Array(10).fill("");
 
-            const a1 = q1 ? String(row[q1] || "") : "";
-            const a2 = q2 ? String(row[q2] || "") : "";
-            const a3 = q3 ? String(row[q3] || "") : "";
-            const a4 = q4 ? String(row[q4] || "") : "";
+            for (let i = 0; i < 10; i++) {
+                const qKey = potentialMarathiKeys[i];
+                if (qKey) {
+                    questions[i] = qKey;
+                    answers[i] = String(row[qKey] || "");
+                }
+            }
 
             // Map to strict array order corresponding to FIXED_SCHEMA_HEADERS
             const rowOutput = [
@@ -102,16 +105,8 @@ export function processCSVData(rawData: RawLead[], headerMapping: Record<string,
                 campaignId,    // Campaign ID
                 source,        // Source
                 city,          // City
-                q1,            // Q1
-                q2,            // Q2
-                q3,            // Q3
-                q4,            // Q4
-                "", "", "", "", "", "", // Q5-Q10 (blank)
-                a1,            // Answer  1
-                a2,            // Answer  2
-                a3,            // Answer  3
-                a4,            // Answer  4
-                "", "", "", "", "", "", // Answer 5-10
+                ...questions,  // Q1-Q10
+                ...answers,    // Answer  1-Answer  10
                 col1,          // Coloumn 1
                 "", "", "", "", "", "", "", "", "", "" // Coloumn 2-10 (10 is duplicated in headers)
             ];

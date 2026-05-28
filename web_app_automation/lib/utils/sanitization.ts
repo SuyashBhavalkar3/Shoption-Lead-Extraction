@@ -70,7 +70,19 @@ const MANDATORY_ALIASES: Record<string, string[]> = {
 };
 
 /**
+ * Maps optional City/Address columns to their possible aliases in raw CSVs
+ */
+const CITY_ALIASES = [
+    'city', 'City', 'CITY',
+    'adress', 'Adress', 'ADRESS',
+    'address', 'Address', 'ADDRESS',
+    'street_address', 'street_adress', 'Street_Address', 'Street Address',
+    'street-address', 'street-adress', 'street address', 'street adress'
+];
+
+/**
  * Validates if the raw data has the mandatory columns (or their aliases)
+ * and maps optional city/address headers.
  */
 export function validateHeaders(headers: string[]): { isValid: boolean; missing: string[]; mapping: Record<string, string> } {
     const missing: string[] = [];
@@ -84,6 +96,12 @@ export function validateHeaders(headers: string[]): { isValid: boolean; missing:
             missing.push(key);
         }
     });
+
+    // Match optional city column
+    const foundCityAlias = CITY_ALIASES.find(alias => headers.includes(alias));
+    if (foundCityAlias) {
+        mapping['city'] = foundCityAlias;
+    }
 
     return {
         isValid: missing.length === 0,

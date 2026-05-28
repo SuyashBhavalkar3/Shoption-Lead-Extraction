@@ -1,4 +1,4 @@
-import { sanitizePhoneNumber, sanitizeCampaignId, generateEmailFromPhone } from '../lib/utils/sanitization';
+import { sanitizePhoneNumber, sanitizeCampaignId, generateEmailFromPhone, validateHeaders } from '../lib/utils/sanitization';
 
 const testPhoneNumbers = [
     { input: "p:+91 9890450988", expected: "9890450988" },
@@ -14,6 +14,14 @@ const testCampaignIds = [
     { input: "c : 123456789", expected: "123456789" },
     { input: "campaign:123456789", expected: "123456789" },
     { input: "123456789", expected: "123456789" },
+];
+
+const testCityHeaders = [
+    { input: ["name", "phone", "campaign", "source", "city"], expected: "city" },
+    { input: ["name", "phone", "campaign", "source", "adress"], expected: "adress" },
+    { input: ["name", "phone", "campaign", "source", "street_address"], expected: "street_address" },
+    { input: ["name", "phone", "campaign", "source", "Street Address"], expected: "Street Address" },
+    { input: ["name", "phone", "campaign", "source", "other"], expected: undefined },
 ];
 
 function runTests() {
@@ -44,6 +52,15 @@ function runTests() {
     const emailPass = email === expectedEmail;
     console.log(`${emailPass ? '✅' : '❌'} Phone: "${phone}" -> Email: "${email}" (Expected: "${expectedEmail}")`);
     if (!emailPass) failed++;
+
+    console.log("\nCity/Address Header Mapping:");
+    testCityHeaders.forEach(t => {
+        const result = validateHeaders(t.input);
+        const mappedCity = result.mapping['city'];
+        const pass = mappedCity === t.expected;
+        console.log(`${pass ? '✅' : '❌'} Headers: [${t.input.join(', ')}] -> Mapped City Header: "${mappedCity}" (Expected: "${t.expected}")`);
+        if (!pass) failed++;
+    });
 
     console.log(`\nTests Completed. ${failed} failures.`);
 }
