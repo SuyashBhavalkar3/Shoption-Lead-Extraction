@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CRM CSV Sanitizer
 
-## Getting Started
+Business-safe web app to sanitize raw lead CSVs into a strict fixed schema for CRM import.
 
-First, run the development server:
+## What It Does
+
+- Upload one or multiple `.csv` files in one shot.
+- Auto-detects header row (checks first 10 rows).
+- Validates mandatory fields with alias support:
+  - `full_name`
+  - `phone_number`
+  - `campaign_id`
+  - `platform`
+- Sanitizes key fields:
+  - Phone number -> keeps last 10 digits
+  - Campaign ID -> keeps numeric digits only
+  - Email -> generated from sanitized phone (`<phone>@gmail.com`)
+  - City -> extracted from mapped city/address column
+- Produces a strict output schema and per-file logs.
+
+## Multi-file Download Behavior
+
+- Each processed file keeps its own **Download** button.
+- When 2+ files are processed, **Download All** appears.
+- **Download All** creates one combined CSV (Excel-openable) where rows are sorted by:
+  1. `campaign_name` (primary)
+  2. `ad_name` (fallback when campaign name is missing)
+- Sort order is ascending (`A -> Z`).
+
+## Output Schema Notes
+
+- Output column order is fixed and enforced.
+- The schema intentionally includes a duplicate `Coloumn 10` header to match the expected downstream format.
+
+## Run Locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Production Build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm run start
+```
 
-## Learn More
+The app is configured to build without external font fetch requirements.
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `npm run dev` - start development server
+- `npm run lint` - run ESLint
+- `npm run build` - create production build
+- `npm run start` - run production server

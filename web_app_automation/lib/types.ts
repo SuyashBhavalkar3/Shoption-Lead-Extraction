@@ -56,11 +56,13 @@ export interface ProcessingLog {
 
 export interface ProcessingResult {
   data: string[][]; // Changed from any[][]
+  sortKeys: string[];
   headers: string[];
   logs: ProcessingLog[];
   summary: {
     totalRows: number;
     processedRows: number;
+    skippedRows: number;
     failedRows: number;
   };
 }

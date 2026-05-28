@@ -49,7 +49,9 @@ export const FIXED_SCHEMA_HEADERS = [
 export function processCSVData(rawData: RawLead[], headerMapping: Record<string, string>): ProcessingResult {
     const logs: ProcessingLog[] = [];
     const processedData: string[][] = [];
+    const sortKeys: string[] = [];
     let processedRows = 0;
+    let skippedRows = 0;
     let failedRows = 0;
 
     const timestamp = new Date().toLocaleTimeString();
@@ -64,6 +66,7 @@ export function processCSVData(rawData: RawLead[], headerMapping: Record<string,
             // Basic row validation - must have at least one valid value
             const values = Object.values(row).filter(v => v !== null && v !== undefined && v !== '');
             if (values.length === 0) {
+                skippedRows++;
                 return; // Silent skip for empty rows
             }
 
@@ -75,7 +78,10 @@ export function processCSVData(rawData: RawLead[], headerMapping: Record<string,
             const source = String(row[headerMapping['platform']] || "");
             const cityKey = headerMapping['city'];
             const city = extractCity(String((cityKey && row[cityKey]) || row['street_address'] || row['City'] || ""));
-            const col1 = String(row['ad_name'] || row['campaign_name'] || "");
+            const campaignName = String(row['campaign_name'] || "");
+            const adName = String(row['ad_name'] || "");
+            const campaignSortKey = (campaignName || adName).trim();
+            const col1 = campaignName || adName;
 
             // Identify Marathi questions (columns with non-ASCII or specific patterns)
             // Usually these are columns that are NOT in our mapping or other standard fields
@@ -112,6 +118,7 @@ export function processCSVData(rawData: RawLead[], headerMapping: Record<string,
             ];
 
             processedData.push(rowOutput);
+            sortKeys.push(campaignSortKey);
             processedRows++;
         } catch (error) {
             failedRows++;
@@ -131,11 +138,13 @@ export function processCSVData(rawData: RawLead[], headerMapping: Record<string,
 
     return {
         data: processedData,
+        sortKeys,
         headers: FIXED_SCHEMA_HEADERS,
         logs,
         summary: {
             totalRows: rawData.length,
             processedRows,
+            skippedRows,
             failedRows
         }
     };

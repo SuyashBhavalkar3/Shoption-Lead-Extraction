@@ -136,7 +136,9 @@ export default function ProcessingDashboard() {
     // ── Aggregate stats across all files ──
     const totalRows = successResults.reduce((s, f) => s + (f.result?.summary.totalRows ?? 0), 0);
     const processedRows = successResults.reduce((s, f) => s + (f.result?.summary.processedRows ?? 0), 0);
+    const skippedRows = successResults.reduce((s, f) => s + (f.result?.summary.skippedRows ?? 0), 0);
     const failedRows = successResults.reduce((s, f) => s + (f.result?.summary.failedRows ?? 0), 0);
+    const skippedOrFailedRows = skippedRows + failedRows;
 
     // ── Handle multiple uploaded files ──
     const handleFilesReady = useCallback((parsedFiles: ParsedFile[]) => {
@@ -184,9 +186,20 @@ export default function ProcessingDashboard() {
 
     // ── Download all files merged into one CSV ──
     const handleDownloadAll = () => {
-        const allRows = successResults.flatMap((f) => f.result!.data);
-        if (allRows.length === 0) return;
-        const csv = Papa.unparse({ fields: FIXED_SCHEMA_HEADERS, data: allRows });
+        const combined = successResults.flatMap((f) =>
+            f.result!.data.map((row, index) => ({
+                row,
+                sortKey: f.result!.sortKeys[index] ?? ''
+            }))
+        );
+
+        if (combined.length === 0) return;
+
+        combined.sort((a, b) =>
+            a.sortKey.localeCompare(b.sortKey, undefined, { numeric: true, sensitivity: 'base' })
+        );
+
+        const csv = Papa.unparse({ fields: FIXED_SCHEMA_HEADERS, data: combined.map((entry) => entry.row) });
         const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         triggerDownload(csv, `sanitized_all_${ts}.csv`);
     };
@@ -211,16 +224,6 @@ export default function ProcessingDashboard() {
 
                 {hasResults && (
                     <div className="flex items-center gap-3">
-                        {successResults.length > 1 && (
-                            <button
-                                onClick={handleDownloadAll}
-                                disabled={isProcessing}
-                                className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-primary-brand hover:bg-primary-brand/90 rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <Files className="w-4 h-4" />
-                                Download All
-                            </button>
-                        )}
                         <button
                             onClick={reset}
                             className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-muted-text hover:text-text-base bg-card-bg border border-card-border hover:bg-bg-base/80 rounded-xl transition-all shadow-sm active:scale-95"
@@ -261,7 +264,7 @@ export default function ProcessingDashboard() {
                     </div>
                     <div className="bg-card-bg/60 backdrop-blur-md p-6 rounded-2xl border border-card-border border-l-4 border-l-rose-500 shadow-md">
                         <p className="text-sm font-semibold text-muted-text">Skipped / Failed</p>
-                        <p className="text-3xl font-extrabold text-rose-500 mt-1">{failedRows}</p>
+                        <p className="text-3xl font-extrabold text-rose-500 mt-1">{skippedOrFailedRows}</p>
                     </div>
                 </div>
             )}
@@ -269,6 +272,18 @@ export default function ProcessingDashboard() {
             {/* ── Per-file Result Cards ── */}
             {hasResults && (
                 <div className="space-y-4">
+                    {successResults.length > 1 && (
+                        <div className="flex justify-start">
+                            <button
+                                onClick={handleDownloadAll}
+                                disabled={isProcessing}
+                                className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-primary-brand hover:bg-primary-brand/90 rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Files className="w-4 h-4" />
+                                Download Combined Sanitized
+                            </button>
+                        </div>
+                    )}
                     {fileResults.map((fr) => (
                         <FileCard key={fr.id} fr={fr} />
                     ))}

@@ -80,6 +80,10 @@ const CITY_ALIASES = [
     'street-address', 'street-adress', 'street address', 'street adress'
 ];
 
+function normalizeHeader(value: string): string {
+    return value.replace(/^\uFEFF/, '').trim().toLowerCase();
+}
+
 /**
  * Validates if the raw data has the mandatory columns (or their aliases)
  * and maps optional city/address headers.
@@ -87,9 +91,19 @@ const CITY_ALIASES = [
 export function validateHeaders(headers: string[]): { isValid: boolean; missing: string[]; mapping: Record<string, string> } {
     const missing: string[] = [];
     const mapping: Record<string, string> = {};
+    const normalizedHeaderMap = new Map<string, string>();
+
+    headers.forEach((header) => {
+        const normalized = normalizeHeader(header);
+        if (!normalizedHeaderMap.has(normalized)) {
+            normalizedHeaderMap.set(normalized, header);
+        }
+    });
 
     Object.entries(MANDATORY_ALIASES).forEach(([key, aliases]) => {
-        const foundAlias = aliases.find(alias => headers.includes(alias));
+        const foundAlias = aliases
+            .map((alias) => normalizedHeaderMap.get(normalizeHeader(alias)))
+            .find((value): value is string => Boolean(value));
         if (foundAlias) {
             mapping[key] = foundAlias;
         } else {
@@ -98,7 +112,9 @@ export function validateHeaders(headers: string[]): { isValid: boolean; missing:
     });
 
     // Match optional city column
-    const foundCityAlias = CITY_ALIASES.find(alias => headers.includes(alias));
+    const foundCityAlias = CITY_ALIASES
+        .map((alias) => normalizedHeaderMap.get(normalizeHeader(alias)))
+        .find((value): value is string => Boolean(value));
     if (foundCityAlias) {
         mapping['city'] = foundCityAlias;
     }
