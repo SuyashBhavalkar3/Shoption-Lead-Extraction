@@ -14,4 +14,4 @@ web_app_automation/dist/
 
 # Do NOT ignore .json files as they are needed for package.json, tsconfig.json, etc.
 # If you want to ignore specific data JSONs, add them explicitly or by folder.
-# *.json 
+# *.json  
