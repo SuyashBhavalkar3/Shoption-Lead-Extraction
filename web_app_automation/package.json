@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:csv-export": "node ./scripts/test-csv-export.js"
   },
   "dependencies": {
     "clsx": "^2.1.1",

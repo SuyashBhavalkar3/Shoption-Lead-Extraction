@@ -19,7 +19,8 @@ function generateCSVBlob(result: NonNullable<FileResult['result']>): string {
 }
 
 function triggerDownload(csvString: string, filename: string) {
-    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const csvWithBom = '\uFEFF' + csvString;
+    const blob = new Blob([csvWithBom], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
