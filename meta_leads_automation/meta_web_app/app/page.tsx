@@ -28,38 +28,42 @@ export default function Home() {
   const [loadingLeads, setLoadingLeads] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [leadsError, setLeadsError] = useState<string | null>(null);
-  const [accessToken, setAccessToken] = useState<string>("");
-  const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [tokenResolved, setTokenResolved] = useState<boolean>(false);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
 
-  // Read saved token from localStorage once on client mount
+  const getFilteredLeads = () => {
+    return leads.filter((lead) => {
+      if (!lead.created_time) return true;
+      const leadDate = new Date(lead.created_time);
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        if (leadDate < start) return false;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        if (leadDate > end) return false;
+      }
+      return true;
+    });
+  };
+
+  const filteredLeads = getFilteredLeads();
+
+  // Fetch Forms on Mount
   useEffect(() => {
-    const savedToken = localStorage.getItem("meta_page_access_token");
-    if (savedToken) {
-      setAccessToken(savedToken);
-    }
-    setTokenResolved(true);
-  }, []);
-
-  // Fetch Forms when accessToken is resolved or changed
-  useEffect(() => {
-    if (!tokenResolved) return;
-
     async function fetchForms() {
       try {
         setLoadingForms(true);
         setError(null);
-        const headers: HeadersInit = {};
-        if (accessToken) {
-          headers["x-access-token"] = accessToken;
-        }
-        const res = await fetch("/api/forms", { headers });
+        const res = await fetch("/api/forms");
         if (!res.ok) {
           const data = await res.json();
           throw new Error(data.error || "Failed to load forms");
         }
         const data = await res.json();
-        const activeForms = (data.data || []).filter((form: LeadForm) => form.status === "ACTIVE");
+        const activeForms = data.data || [];
         setForms(activeForms);
         if (activeForms.length > 0) {
           setSelectedFormId(activeForms[0].id);
@@ -75,11 +79,11 @@ export default function Home() {
       }
     }
     fetchForms();
-  }, [accessToken, tokenResolved]);
+  }, []);
 
-  // Fetch Leads when Selected Form or accessToken Changes
+  // Fetch Leads when Selected Form Changes
   useEffect(() => {
-    if (!selectedFormId || !tokenResolved) {
+    if (!selectedFormId) {
       setLeads([]);
       return;
     }
@@ -88,11 +92,7 @@ export default function Home() {
       try {
         setLoadingLeads(true);
         setLeadsError(null);
-        const headers: HeadersInit = {};
-        if (accessToken) {
-          headers["x-access-token"] = accessToken;
-        }
-        const res = await fetch(`/api/leads?formId=${selectedFormId}`, { headers });
+        const res = await fetch(`/api/leads?formId=${selectedFormId}`);
         if (!res.ok) {
           const data = await res.json();
           throw new Error(data.error || "Failed to load leads");
@@ -107,7 +107,7 @@ export default function Home() {
       }
     }
     fetchLeads();
-  }, [selectedFormId, accessToken, tokenResolved]);
+  }, [selectedFormId]);
 
   // Extract all unique field names to act as dynamic columns
   const getUniqueFields = () => {
@@ -151,9 +151,9 @@ export default function Home() {
   };
 
   const handleDownloadRaw = () => {
-    if (leads.length === 0) return;
+    if (filteredLeads.length === 0) return;
     const headers = ["Lead ID", "Created Time", ...uniqueFields];
-    const rows = leads.map((lead) => {
+    const rows = filteredLeads.map((lead) => {
       return [
         lead.id,
         lead.created_time,
@@ -170,7 +170,7 @@ export default function Home() {
   };
 
   const handleDownloadSanitized = () => {
-    if (leads.length === 0) return;
+    if (filteredLeads.length === 0) return;
 
     // The exact columns requested by the user
     const headers = [
@@ -185,7 +185,7 @@ export default function Home() {
       "Coloumn 1", "Coloumn 2", "Coloumn 3", "Coloumn 4", "Coloumn 5", "Coloumn 6", "Coloumn 7", "Coloumn 8", "Coloumn 9", "Coloumn 10", "Coloumn 10"
     ];
 
-    const rows = leads.map((lead) => {
+    const rows = filteredLeads.map((lead) => {
       const fieldData = lead.field_data || [];
 
       // Helper to find field value matching patterns
@@ -301,66 +301,11 @@ export default function Home() {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 space-y-6">
-        {/* Settings / Custom Token Input */}
-        <section className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <svg className="h-5 w-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              <h3 className="text-sm font-semibold text-slate-200">Session Access Token Settings</h3>
-            </div>
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              className="text-xs text-teal-400 hover:text-teal-300 transition-colors font-medium cursor-pointer"
-            >
-              {showSettings ? "Hide Settings" : "Configure Custom Token (Optional)"}
-            </button>
-          </div>
-
-          {(showSettings || !accessToken) && (
-            <div className="space-y-3 pt-2 border-t border-slate-800/80">
-              <p className="text-xs text-slate-400 leading-relaxed">
-                If the token in <code>.env.local</code> has expired, paste a new Facebook Page Access Token here. It will be securely sent in API request headers and saved locally in your browser so you don't have to keep editing configuration files.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <input
-                  type="password"
-                  placeholder="Paste your Page Access Token here..."
-                  value={accessToken}
-                  onChange={(e) => {
-                    const token = e.target.value;
-                    setAccessToken(token);
-                    localStorage.setItem("meta_page_access_token", token);
-                  }}
-                  className="flex-1 bg-slate-900 border border-slate-700/80 text-slate-100 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all font-mono"
-                />
-                {accessToken && (
-                  <button
-                    onClick={() => {
-                      setAccessToken("");
-                      localStorage.removeItem("meta_page_access_token");
-                    }}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-all border border-slate-700/60 cursor-pointer"
-                  >
-                    Clear Override
-                  </button>
-                )}
-              </div>
-              {accessToken && (
-                <div className="text-[11px] text-teal-400 flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-teal-400"></span>
-                  Custom session token override active
-                </div>
-              )}
-            </div>
-          )}
-        </section>
-
+      <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 space-y-8">
         {/* Top Control Panel */}
-        <section className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-6 shadow-xl backdrop-blur-sm grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-          <div className="md:col-span-2 space-y-2">
+        <section className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-6 shadow-xl backdrop-blur-sm grid grid-cols-1 lg:grid-cols-4 gap-6 items-end">
+          {/* Campaign Selection */}
+          <div className="lg:col-span-2 space-y-2">
             <label className="block text-sm font-semibold text-slate-300">
               Select Lead Generation Campaign Form
             </label>
@@ -395,18 +340,70 @@ export default function Home() {
             )}
           </div>
 
+          {/* Date Filtering Inputs */}
+          <div className="lg:col-span-2 grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700/80 text-slate-100 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all cursor-pointer font-mono"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                End Date
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700/80 text-slate-100 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all cursor-pointer font-mono"
+                />
+                {(startDate || endDate) && (
+                  <button
+                    onClick={() => {
+                      setStartDate("");
+                      setEndDate("");
+                    }}
+                    title="Clear date filters"
+                    className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Lead Details, Stats & Export Container */}
+        <section className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
           {/* Quick Stats Panel */}
-          <div className="bg-gradient-to-br from-slate-900 to-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center h-full">
+          <div className="bg-slate-950/40 border border-slate-800/80 p-5 rounded-2xl shadow-xl backdrop-blur-sm flex lg:flex-col justify-between lg:justify-center items-center lg:items-start gap-4">
             <div className="space-y-1">
               <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block">
-                Total Leads Retrieved
+                Leads Filtered / Total
               </span>
-              <span className="text-2xl font-extrabold text-teal-400 tracking-tight">
-                {loadingLeads ? "..." : leads.length}
-              </span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-extrabold text-teal-400 tracking-tight">
+                  {loadingLeads ? "..." : filteredLeads.length}
+                </span>
+                {leads.length > 0 && !loadingLeads && (
+                  <span className="text-sm text-slate-400">
+                    / {leads.length}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="h-10 w-10 rounded-lg bg-teal-950/50 flex items-center justify-center border border-teal-900/30">
-              <svg className="h-5 w-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="h-12 w-12 rounded-xl bg-teal-950/50 flex items-center justify-center border border-teal-900/30 shrink-0">
+              <svg className="h-6 w-6 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -416,118 +413,118 @@ export default function Home() {
               </svg>
             </div>
           </div>
-        </section>
 
-        {/* Lead Details & Export Controls */}
-        <section className="bg-slate-950/40 border border-slate-800/80 rounded-2xl overflow-hidden shadow-xl backdrop-blur-sm">
-          <div className="px-6 py-5 border-b border-slate-800 bg-slate-950/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-bold text-slate-100">Leads Explorer</h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Form ID: <code className="text-teal-400 select-all font-mono">{selectedFormId || "none"}</code>
-              </p>
-            </div>
-
-            {/* Export Buttons */}
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={handleDownloadRaw}
-                disabled={leads.length === 0 || loadingLeads}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-sm transition-all shadow-md shadow-slate-950/50 disabled:opacity-40 disabled:hover:bg-slate-800 disabled:cursor-not-allowed border border-slate-700/60"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  />
-                </svg>
-                Download Raw CSV
-              </button>
-              <button
-                onClick={handleDownloadSanitized}
-                disabled={leads.length === 0 || loadingLeads}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-bold rounded-xl text-sm transition-all shadow-md shadow-teal-500/10 disabled:opacity-40 disabled:bg-slate-800 disabled:text-slate-400 disabled:cursor-not-allowed"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2.5}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                Download Sanitized CSV
-              </button>
-            </div>
-          </div>
-
-          {/* Table Container */}
-          <div className="overflow-x-auto max-h-[500px]">
-            {loadingLeads ? (
-              <div className="p-12 flex flex-col items-center justify-center gap-3">
-                <div className="h-8 w-8 rounded-full border-4 border-teal-500/20 border-t-teal-500 animate-spin"></div>
-                <span className="text-slate-400 text-sm">Retrieving leads from Meta servers...</span>
+          {/* Lead Details & Export Table */}
+          <div className="lg:col-span-3 bg-slate-950/40 border border-slate-800/80 rounded-2xl overflow-hidden shadow-xl backdrop-blur-sm">
+            <div className="px-6 py-5 border-b border-slate-800 bg-slate-950/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-100">Leads Explorer</h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Form ID: <code className="text-teal-400 select-all font-mono">{selectedFormId || "none"}</code>
+                </p>
               </div>
-            ) : leadsError ? (
-              <div className="p-8 text-center">
-                <div className="text-red-400 font-semibold mb-2">Failed to load leads</div>
-                <p className="text-xs text-slate-400 max-w-md mx-auto">{leadsError}</p>
-              </div>
-            ) : leads.length === 0 ? (
-              <div className="p-16 text-center text-slate-500 text-sm">
-                <svg
-                  className="mx-auto h-12 w-12 text-slate-600 mb-3"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+
+              {/* Export Buttons */}
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={handleDownloadRaw}
+                  disabled={filteredLeads.length === 0 || loadingLeads}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-sm transition-all shadow-md shadow-slate-950/50 disabled:opacity-40 disabled:hover:bg-slate-800 disabled:cursor-not-allowed border border-slate-700/60 cursor-pointer"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-                  />
-                </svg>
-                No leads found for this campaign form.
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
+                  </svg>
+                  Download Raw CSV
+                </button>
+                <button
+                  onClick={handleDownloadSanitized}
+                  disabled={filteredLeads.length === 0 || loadingLeads}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-bold rounded-xl text-sm transition-all shadow-md shadow-teal-500/10 disabled:opacity-40 disabled:bg-slate-800 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2.5}
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Download Sanitized CSV
+                </button>
               </div>
-            ) : (
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="bg-slate-900/60 border-b border-slate-800 text-slate-300 font-medium select-none">
-                    <th className="px-6 py-4">Lead ID</th>
-                    <th className="px-6 py-4">Created Time</th>
-                    {uniqueFields.map((field) => (
-                      <th key={field} className="px-6 py-4 capitalize whitespace-nowrap">
-                        {field.replace(/_/g, " ")}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 bg-slate-950/20">
-                  {leads.map((lead) => (
-                    <tr key={lead.id} className="hover:bg-slate-900/35 transition-colors">
-                      <td className="px-6 py-4 font-mono text-xs text-teal-400 select-all font-semibold">
-                        {lead.id}
-                      </td>
-                      <td className="px-6 py-4 text-slate-400 whitespace-nowrap">
-                        {new Date(lead.created_time).toLocaleString()}
-                      </td>
-                      {uniqueFields.map((field) => {
-                        const matched = lead.field_data?.find((fd) => fd.name === field);
-                        const value = matched && matched.values ? matched.values.join(", ") : "-";
-                        return (
-                          <td key={field} className="px-6 py-4 text-slate-300 max-w-xs truncate">
-                            {value}
-                          </td>
-                        );
-                      })}
+            </div>
+
+            {/* Table Container */}
+            <div className="overflow-x-auto max-h-[500px]">
+              {loadingLeads ? (
+                <div className="p-12 flex flex-col items-center justify-center gap-3">
+                  <div className="h-8 w-8 rounded-full border-4 border-teal-500/20 border-t-teal-500 animate-spin"></div>
+                  <span className="text-slate-400 text-sm">Retrieving leads from Meta servers...</span>
+                </div>
+              ) : leadsError ? (
+                <div className="p-8 text-center">
+                  <div className="text-red-400 font-semibold mb-2">Failed to load leads</div>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">{leadsError}</p>
+                </div>
+              ) : filteredLeads.length === 0 ? (
+                <div className="p-16 text-center text-slate-500 text-sm">
+                  <svg
+                    className="mx-auto h-12 w-12 text-slate-600 mb-3"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                    />
+                  </svg>
+                  No leads match the filter criteria for this form.
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-slate-900/60 border-b border-slate-800 text-slate-300 font-medium select-none">
+                      <th className="px-6 py-4">Lead ID</th>
+                      <th className="px-6 py-4">Created Time</th>
+                      {uniqueFields.map((field) => (
+                        <th key={field} className="px-6 py-4 capitalize whitespace-nowrap">
+                          {field.replace(/_/g, " ")}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 bg-slate-950/20">
+                    {filteredLeads.map((lead) => (
+                      <tr key={lead.id} className="hover:bg-slate-900/35 transition-colors">
+                        <td className="px-6 py-4 font-mono text-xs text-teal-400 select-all font-semibold">
+                          {lead.id}
+                        </td>
+                        <td className="px-6 py-4 text-slate-400 whitespace-nowrap">
+                          {new Date(lead.created_time).toLocaleString()}
+                        </td>
+                        {uniqueFields.map((field) => {
+                          const matched = lead.field_data?.find((fd) => fd.name === field);
+                          const value = matched && matched.values ? matched.values.join(", ") : "-";
+                          return (
+                            <td key={field} className="px-6 py-4 text-slate-300 max-w-xs truncate">
+                              {value}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         </section>
       </main>

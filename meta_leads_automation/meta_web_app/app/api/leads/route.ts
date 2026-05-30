@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
-  const customToken = request.headers.get("x-access-token");
-  const envToken = process.env.PAGE_ACCESS_TOKEN;
-  const token = customToken || envToken;
+  const token = process.env.PAGE_ACCESS_TOKEN;
 
   if (!token) {
     return NextResponse.json(
-      { error: "Access token is missing. Please configure it in .env.local or enter it in the dashboard settings." },
-      { status: 400 }
+      { error: "PAGE_ACCESS_TOKEN is not configured in .env.local" },
+      { status: 500 }
     );
   }
 
