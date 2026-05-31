@@ -458,7 +458,7 @@ export default function Home() {
           {/* Left Side: Brand Logo and Title */}
           <div className="flex items-center gap-3">
             <img 
-              src="/logo.png" 
+              src="/logo.svg" 
               alt="Logo" 
               className="h-8 w-8 object-contain border border-[#000000]" 
             />
@@ -598,7 +598,7 @@ export default function Home() {
                           <div className="flex items-center gap-3">
                             <div className="w-12 h-10 border border-[#000000] bg-[#ffffff] flex-shrink-0 flex items-center justify-center overflow-hidden">
                               <img 
-                                src="/logo 2.png" 
+                                src="/logoa.png" 
                                 alt="Ad Thumbnail" 
                                 className="w-full h-full object-contain" 
                               />
